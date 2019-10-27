@@ -1,0 +1,18 @@
+openldap_server_pkgs:
+  - 'slapd'
+  - 'ldap-utils'
+  - "{{ (ansible_facts['python']['version']['major'] == 2) | ternary('python-ldap', 'python3-ldap') }}"
+openldap_server_pkgs_extra:
+  smbk5pwd:
+    - 'slapd-contrib'
+openldap_server_user: 'openldap'
+openldap_server_group: 'openldap'
+openldap_server_slapd_path: '/usr/sbin/slapd'
+openldap_server_config_path: '/etc/ldap/slapd.d'
+openldap_server_schema_path: '/etc/ldap/schema'
+openldap_server_module_path: '/usr/lib/ldap'
+openldap_server_runtime_path: '/run/slapd'
+openldap_server_db_path: '/var/lib/ldap'
+openldap_server_service_config_file: '/etc/default/slapd'
+openldap_server_service_config_regex: '^(SLAPD_SERVICES=").*(ldapi://.*")'
+openldap_server_service_config_line: '\1ldap:/// ldaps:/// \2'

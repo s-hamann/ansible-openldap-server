@@ -1,0 +1,82 @@
+openldap_server_pkgs:
+  - 'openldap'
+  - 'openldap-clients'
+  - 'py3-pyldap'
+openldap_server_pkgs_extra:
+  back_bdb:
+    - 'openldap-back-bdb'
+  back_dnssrv:
+    - 'openldap-back-dnssrv'
+  back_hdb:
+    - 'openldap-back-hdb'
+  back_ldap:
+    - 'openldap-back-ldap'
+  back_mdb:
+    - 'openldap-back-mdb'
+  back_meta:
+    - 'openldap-back-meta'
+  back_monitor:
+    - 'openldap-back-monitor'
+  back_null:
+    - 'openldap-back-null'
+  back_passwd:
+    - 'openldap-back-passwd'
+  back_relay:
+    - 'openldap-back-relay'
+  back_shell:
+    - 'openldap-back-shell'
+  back_sock:
+    - 'openldap-back-sock'
+  back_sql:
+    - 'openldap-back-sql'
+  accesslog:
+    - 'openldap-overlay-accesslog'
+  auditlog:
+    - 'openldap-overlay-auditlog'
+  collect:
+    - 'openldap-overlay-collect'
+  constraint:
+    - 'openldap-overlay-constraint'
+  dds:
+    - 'openldap-overlay-dds'
+  deref:
+    - 'openldap-overlay-deref'
+  dyngroup:
+    - 'openldap-overlay-dyngroup'
+  dynlist:
+    - 'openldap-overlay-dynlist'
+  memberof:
+    - 'openldap-overlay-memberof'
+  pcache:
+    - 'openldap-overlay-proxycache'
+  ppolicy:
+    - 'openldap-overlay-ppolicy'
+  refint:
+    - 'openldap-overlay-refint'
+  retcode:
+    - 'openldap-overlay-retcode'
+  rwm:
+    - 'openldap-overlay-rwm'
+  seqmod:
+    - 'openldap-overlay-seqmod'
+  sssvlv:
+    - 'openldap-overlay-sssvlv'
+  syncprov:
+    - 'openldap-overlay-syncprov'
+  translucent:
+    - 'openldap-overlay-translucent'
+  unique:
+    - 'openldap-overlay-unique'
+  valsort:
+    - 'openldap-overlay-valsort'
+openldap_server_user: 'ldap'
+openldap_server_group: 'ldap'
+openldap_server_slapd_path: '/usr/sbin/slapd'
+openldap_server_config_path: '/etc/openldap/slapd.d'
+openldap_server_schema_path:  '/etc/openldap/schema'
+openldap_server_module_path: '/usr/lib/openldap'
+openldap_server_runtime_path: '/run/openldap'
+openldap_server_db_path: '/var/lib/openldap/openldap-data'
+openldap_server_service_config_file: '/etc/conf.d/slapd'
+openldap_server_service_config_regex: '^(?:#\s*)?(command_args=".*-h '').*ldapi://.*(''")'
+openldap_server_service_config_line: '\1ldap:/// ldaps:/// ldapi:///\2'

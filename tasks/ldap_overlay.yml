@@ -1,0 +1,30 @@
+---
+# This file enables the overlay specified by 'overlay' in the DIT given by '_tree_config_dn'.
+# The format for '_tree_config_dn' is the olcDatabase entry of the DIT, e.g. 'olcDatabase={1}mdb,cn=config'.
+
+# Note: Attributes are set twice.
+# First at initial creation of the entry (using ldap_entry). This is required when using the smbk5pwd overlay without a working kerberos setup, but compiled in kerberos support.
+# ldap_attr is used to set the attributes again. This is required, since ldap_entry does not change existing entries.
+
+- name: "enable overlay {{ overlay }}"
+  ldap_entry:
+    dn: "olcOverlay={{ overlay }},{{ _tree_config_dn }}"
+    objectClass:
+      - 'olcOverlayConfig'
+      - "{{ openldap_server_overlay_details[overlay]['objectclass'] | mandatory }}"
+    attributes: "{{ openldap_server_overlay_defaults[overlay | lower] | default({}) | combine(openldap_server_overlay_config[overlay | lower] | default({})) | combine({'olcOverlay': overlay}) }}"
+  register: _enable_overlay
+  when: "_active_overlays | map('regex_search', '\\{[0-9]+\\}' ~ overlay | regex_escape) | select('string') | list | length == 0"
+
+- include_tasks: get_active_overlays.yml
+  when: '_enable_overlay is changed'
+
+- name: "configure overlay {{ overlay }}"
+  ldap_attr:
+    dn: "olcOverlay={{ _active_overlays | map('regex_search', '\\{[0-9]+\\}' ~ overlay | regex_escape) | select('string') | first }},{{ _tree_config_dn }}"
+    name: "{{ item.key }}"
+    values: "{{ item.value }}"
+    state: exact
+  loop: "{{ openldap_server_overlay_defaults[overlay | lower] | default({}) | combine(openldap_server_overlay_config[overlay | lower] | default({})) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}: {{ item.value }}"

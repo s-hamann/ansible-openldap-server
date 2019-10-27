@@ -1,0 +1,13 @@
+---
+# This file sets the fact '_active_overlays' to the currently active overlays for the tree in '_tree_config_dn'.
+# The format for '_tree_config_dn' is the olcDatabase entry of the DIT, e.g. 'olcDatabase={1}mdb,cn=config'.
+# '_active_overlays' includes the indices.
+
+- name: "get active overlays"
+  command: "ldapsearch -Y EXTERNAL -H ldapi:// -LLL -b {{ _tree_config_dn | quote }} -s one 'objectClass=olcOverlayConfig' olcOverlay"
+  changed_when: false
+  register: _ldapsearch_active_overlays
+
+- name: 'extract active overlays'
+  set_fact:
+    _active_overlays: "{{ _ldapsearch_active_overlays.stdout | regex_findall('(?<=olcOverlay: )\\{[0-9]+\\}[a-z0-9_-]+', ignorecase=true) }}"

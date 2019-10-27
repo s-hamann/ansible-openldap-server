@@ -1,0 +1,120 @@
+# Creates and populates a DIT in the directory using the data in the 'tree' variable.
+
+- name: 'determine root DN'
+  set_fact:
+    _olcRootDN: "{{ tree.root_dn | default(openldap_server_default_root_dn) ~ ',' ~ tree.expanded_dn }}"
+  when: "tree.root_dn | default(openldap_server_default_root_dn) is defined"
+
+- name: 'determine root password'
+  set_fact:
+    _olcRootPW: "{{ tree.root_password | default(openldap_server_default_root_password) | password_hash('sha512', 65535 | random(seed=inventory_hostname~tree.expanded_dn) | hash('md5')) }}"
+  no_log: true
+  when: "tree.root_dn | default(openldap_server_default_root_dn) is defined and tree.root_password | default(openldap_server_default_root_password) is defined"
+
+- name: "create data directory for {{ tree.expanded_dn }}"
+  file:
+    path: "{{ tree.db_directory | default(openldap_server_db_path) }}"
+    state: directory
+    owner: "{{ openldap_server_user }}"
+    group: "{{ openldap_server_group }}"
+    mode: 0700
+
+- name: "create tree {{ tree.expanded_dn }}"
+  ldap_entry:
+    dn: "olcDatabase={{ tree.database | default('mdb') }},cn=config"
+    objectClass:
+      - 'olcDatabaseConfig'
+      - "olc{{ tree.database | default('mdb') }}Config"
+    attributes:
+      olcDatabase: "{{ tree.database | default('mdb') }}"
+      olcSuffix: "{{ tree.expanded_dn }}"
+      olcDbDirectory: "{{ tree.db_directory | default(openldap_server_db_path) }}"
+    state: present
+  register: _result
+  failed_when: "_result is failed and 'already served by a preceding ' ~ tree.database | default('mdb') | lower ~ ' database' not in _result.details | default('')"
+
+- name: "get indexed database DN of tree {{ tree.expanded_dn }}"
+  command: "ldapsearch -Y EXTERNAL -H ldapi:// -LLL -b 'cn=config' -s one 'olcSuffix={{ tree.expanded_dn }}' dn"
+  changed_when: false
+  register: _ldapsearch_indexed_dn
+
+- name: "extract indexed database DN of tree {{ tree.expanded_dn }}"
+  set_fact:
+    _indexed_dn: "{{ (_ldapsearch_indexed_dn.stdout | trim)[4:] }}"
+
+- name: 'set database-specific configuration options'
+  ldap_attr:
+    dn: "{{ _indexed_dn }}"
+    name: "{{ item.key }}"
+    values: "{{ item.value | default(None) }}"
+    state: exact
+  no_log: "{{ item.no_log | default(false) | bool }}"
+  loop:
+    - key: 'olcRootDN'
+      value: "{{ _olcRootDN }}"
+    - key: 'olcRootPW'
+      value: "{CRYPT}{{ _olcRootPW | default(None) }}"
+      no_log: true
+      when: "{{ _olcRootPW is defined }}"
+    - key: 'olcDbMaxSize'
+      value: "{{ tree.db_max_size | default('100 MB') | human_to_bytes }}"
+    - key: 'olcDbCheckpoint'
+      value: "{{ tree.db_checkpoint_bytes | default(0) | human_to_bytes }} {{ tree.db_checkpoint_time | default(0) }}"
+      when: "{{ tree.db_checkpoint_bytes is defined or tree.db_checkpoint_time is defined }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: "item.when | default(item.value)"
+
+- name: 'set indices'
+  ldap_attr:
+    dn: "{{ _indexed_dn }}"
+    name: 'olcDbIndex'
+    values: "{{ index.key }} {{ [index.value] | flatten | join(',') }}"
+    state: present
+  loop: "{{ tree.indices | default({}) | dict2items }}"
+  loop_control:
+    loop_var: index
+    label: "{{ index.key }} {{ [index.value] | flatten | join(',') }}"
+
+- name: 'determine ACLs'
+  set_fact:
+    tree_acls: "{{ openldap_server_default_acls + tree.acls | default([]) }}"
+
+- name: 'set ACLs'
+  ldap_attr:
+    dn: "{{ _indexed_dn }}"
+    name: 'olcAccess'
+    values: "{{ range(tree_acls | length) | map('regex_replace', '([0-9]+)', '{\\1}') | zip(tree_acls) | map('join', '') | list }}"
+    state: exact
+
+- name: 'prepare ppolicy configuration'
+  set_fact:
+    openldap_server_overlay_defaults: "{{ openldap_server_overlay_defaults | combine({'ppolicy': {'olcPPolicyDefault': tree.ppolicy_dn | default('cn=default,ou=policies') ~ ',' ~ tree.expanded_dn }}, recursive=true) }}"
+  when: "'ppolicy' in openldap_server_overlays"
+
+- name: 'prepare smbk5pwd configuration'
+  set_fact:
+    openldap_server_overlay_defaults: "{{ openldap_server_overlay_defaults | combine({'smbk5pwd': {'olcSmbK5PwdEnable': openldap_server_sync_samba | bool | ternary(['samba'], []) + openldap_server_sync_kerberos | bool | ternary(['krb5'], []) }}, recursive=true) }}"
+  when: "openldap_server_sync_samba | bool or openldap_server_sync_kerberos | bool"
+
+- name: 'determine Samba domain SID'
+  set_fact:
+    _samba_sid: "{{ tree.samba_sid | default('S-1-5-21-' ~ 100000000 | random(seed=tree.expanded_dn ~ 1) ~ '-' ~ 100000000 | random(seed=tree.expanded_dn ~ 2) ~ '-' ~ 100000000 | random(seed=tree.expanded_dn ~ 3)) }}"
+  when: "'samba' in openldap_server_schemas"
+
+- include_tasks: get_active_overlays.yml
+  vars:
+    _tree_config_dn: "{{ _indexed_dn }}"
+
+- include_tasks: ldap_overlay.yml
+  vars:
+    _tree_config_dn: "{{ _indexed_dn }}"
+  loop: "{{ openldap_server_overlays | default([]) }}"
+  loop_control:
+    loop_var: overlay
+
+- name: "populate {{ tree.expanded_dn }}"
+  include_tasks: ldap_entry.yml
+  loop: "{{ tree.data | ldap_tree2list }}"
+  loop_control:
+    loop_var: entry

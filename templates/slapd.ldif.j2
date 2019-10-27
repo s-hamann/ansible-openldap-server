@@ -1,0 +1,32 @@
+{# vim: filetype=ldif.jinja2 #}
+dn: cn=config
+objectClass: olcGlobal
+cn: config
+olcArgsFile: {{ openldap_server_runtime_path }}/slapd.args
+olcPidFile: {{ openldap_server_runtime_path }}/slapd.pid
+
+dn: cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: schema
+
+{% for schema in openldap_server_schemas %}
+include: file://{{ openldap_server_schema_path }}/{{ schema }}.ldif
+{% endfor %}
+
+dn: olcDatabase=frontend,cn=config
+objectClass: olcDatabaseConfig
+objectClass: olcFrontendConfig
+olcDatabase: frontend
+olcAccess: to * by dn.exact="gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth" manage by * break
+olcAccess: to dn.exact="" by * read
+olcAccess: to dn.base="cn=Subschema" by * read
+
+dn: olcDatabase=config,cn=config
+objectClass: olcDatabaseConfig
+olcDatabase: config
+olcAccess: to * by dn.exact="gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth" manage by * break
+
+dn: cn=module{0},cn=config
+objectClass: olcModuleList
+cn: module{0}
+olcModulePath: "{{ openldap_server_module_path }}"

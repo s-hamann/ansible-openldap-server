@@ -1,0 +1,435 @@
+---
+- name: 'gather os specific variables'
+  include_vars: '{{ item }}'
+  with_first_found:
+    - "{{ ansible_facts['distribution'] }}-{{ ansible_facts['distribution_major_version'] }}.yml"
+    - "{{ ansible_facts['distribution'] }}.yml"
+    - "{{ ansible_facts['os_family'] }}.yml"
+    - 'default.yml'
+
+- name: 'convert configured overlay names to lower case'
+  set_fact:
+    openldap_server_overlays: "{{ openldap_server_overlays | map('lower') | list }}"
+
+- name: 'prepare samba sync requirements'
+  set_fact:
+    openldap_server_overlays: "{{ openldap_server_overlays | union(['smbk5pwd']) }}"
+    openldap_server_schemas: "{{ openldap_server_schemas | union(['samba']) }}"
+  when: "openldap_server_sync_samba | bool"
+
+- name: 'prepare kerberos sync requirements'
+  set_fact:
+    openldap_server_overlays: "{{ openldap_server_overlays | union(['smbk5pwd']) }}"
+    openldap_server_schemas: "{{ openldap_server_schemas | union(['krb5-kdc']) }}"
+  when: "openldap_server_sync_kerberos | bool"
+
+- name: 'prepare modules list'
+  set_fact:
+    openldap_server_modules: "{{ openldap_server_modules | union(openldap_server_overlays) | union(openldap_server_dit | map(attribute='database') | map('default', 'mdb') | map('regex_replace', '^', 'back_') | list) }}"
+
+- name: 'prepare module and overlay requirements'
+  set_fact:
+    openldap_server_pkgs: "{{ openldap_server_pkgs | union(openldap_server_modules | select('in', openldap_server_pkgs_extra | default({})) | map('extract', openldap_server_pkgs_extra | default({})) | flatten) }}"
+    openldap_server_schemas: "{{ openldap_server_schemas | union(openldap_server_overlays | select('in', openldap_server_overlay_details) | map('extract', openldap_server_overlay_details) | map(attribute='schema') | select('defined') | list | flatten) }}"
+
+- name: 'determine default ACLs'
+  set_fact:
+    openldap_server_default_acls: "{{ openldap_server_default_acls | default([]) + item.acls }}"
+  loop:
+    - acls:
+      # This allows full access for the system's root user. Required by this role.
+      - 'to * by dn.exact="gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth" manage by * break'
+      when: true
+    - acls:
+      # This enables authentication and password changes. It disallows any other access to the password. This means that only the system's root user can reset passwords.
+      - 'to attrs=userPassword by anonymous =x by self =w'
+    - acls:
+      # This allows reading the dn and objectClass of everything for authenticated users. This is commonly required to find entries.
+      - 'to attrs=entry,objectClass by users read by * break'
+    - acls:
+      # This is required for password changes.
+      - 'to attrs=sambaLMPassword,sambaNTPassword,sambaClearTextPassword,sambaPasswordHistory,sambaPreviousClearTextPassword, by self =w by * break'
+      - 'to attrs=sambaPwdLastSet,sambaPwdMustChange by self write by * break'
+      # Prevent all other access to the LM hash as it is horribly broken.
+      - 'to attrs=sambaLMPassword by * none'
+      when: "{{ not openldap_server_skip_default_acls | bool and 'samba' in openldap_server_schemas }}"
+    - acls:
+      # Allow users to change their SSH key.
+      - 'to attrs=sshPublicKey by self write by * break'
+      when: "{{ not openldap_server_skip_default_acls | bool and 'openssh-lpk' in openldap_server_schemas }}"
+  loop_control:
+    label: "{{ item.acls }}"
+  when: "item.when | default(not openldap_server_skip_default_acls) | bool"
+
+- name: 'set required USE flags'
+  block:
+    - name: 'determine USE flags for net-nds/openldap'
+      set_fact:
+        openldap_use_flags: "{{ openldap_use_flags | default(['crypt', '-minimal', 'sasl'] | union(openldap_server_use | default([]))) | union([item.use] | flatten) }}"
+      loop:
+        - use: 'ssl'
+          when: "{{ openldap_server_tls_cert is defined }}"
+        - use: 'overlays'
+          when: "{{ openldap_server_overlays | difference(['syncprov']) | length }}" # Note: 'syncprov' is always built in, independent of the 'overlays' USE flag
+        - use:
+            - samba
+            - smbkrb5passwd
+          when: "{{ openldap_server_sync_samba | bool }}"
+        - use:
+            - kerberos
+            - smbkrb5passwd
+          when: "{{ openldap_server_sync_kerberos | bool }}"
+      when: "item.when"
+
+    - name: 'set USE flags for net-nds/openldap'
+      lineinfile:
+        path: '/etc/portage/package.use/net'
+        line: "net-nds/openldap {{ openldap_use_flags | join(' ') }}"
+        create: true
+        owner: root
+        group: root
+        mode: 0644
+        state: present
+
+    - name: 'set USE flags for dev-python/python-ldap'
+      lineinfile:
+        path: '/etc/portage/package.use/dev'
+        line: 'dev-python/python-ldap sasl'
+        create: true
+        owner: root
+        group: root
+        mode: 0644
+        state: present
+
+  when: "ansible_facts['pkg_mgr'] == 'portage'"
+
+- name: 'disable Debian pre-configured database'
+  debconf:
+    name: 'slapd'
+    question: 'slapd/no_configuration'
+    vtype: 'boolean'
+    value: 'true'
+  when: "ansible_facts['pkg_mgr'] == 'apt'"
+
+- name: 'check installation status'
+  stat:
+    path: "{{ openldap_server_slapd_path }}"
+  register: _slapd
+
+# This prevents apt (and other package managers) from automatically starting slapd on installation.
+# At least for Debian this would fail, since slapd is not configured at all.
+- name: 'mask slapd.service'
+  systemd:
+    name: 'slapd'
+    masked: true
+  when: "ansible_facts['service_mgr'] == 'systemd' and not _slapd.stat.exists"
+
+- name: 'install openldap'
+  package:
+    name: "{{ openldap_server_pkgs }}"
+    changed_use: "{{ (ansible_facts['pkg_mgr'] == 'portage') | ternary(true, omit) }}"
+    state: present
+
+- name: 'copy non-default schema files'
+  copy:
+    dest: "{{ openldap_server_schema_path }}"
+    src: "schemas/{{ schema }}.ldif"
+    owner: root
+    group: root
+    mode: 0644
+  loop: "{{ lookup('fileglob', 'schemas/*.ldif', wantlist=true) | map('basename') | map('regex_replace', '\\.ldif$', '') | list }}"
+  loop_control:
+    loop_var: schema
+  diff: false
+  when: "schema in openldap_server_schemas"
+
+- name: 'harden slapd.service'
+  block:
+    - name: 'create override directory for slapd.service'
+      file:
+        path: '/etc/systemd/system/slapd.service.d/'
+        state: directory
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: 'install override file for slapd.service'
+      template:
+        dest: '/etc/systemd/system/slapd.service.d/override.conf'
+        src: 'slapd_override.conf.j2'
+        owner: root
+        group: root
+        mode: 0644
+      notify:
+        - 'openldap_server_reload_service_files'
+        - 'restart slapd'
+
+  when: "ansible_facts['service_mgr'] == 'systemd'"
+
+- name: "add {{ openldap_server_user }} to extra groups"
+  user:
+    name: "{{ openldap_server_user }}"
+    groups: "{{ openldap_server_extra_groups }}"
+    append: true
+  notify: 'restart slapd'
+  when: "openldap_server_extra_groups | default([])"
+
+- name: 'check if {{ openldap_server_config_path }} exists'
+  stat:
+    path: "{{ openldap_server_config_path }}"
+  register: _openldap_slapd_d
+
+- block:
+
+  - name: 'create {{ openldap_server_config_path }}'
+    file:
+      path: "{{ openldap_server_config_path }}"
+      state: directory
+      owner: "{{ openldap_server_user }}"
+      group: "{{ openldap_server_group }}"
+      mode: 0755
+
+  - name: 'create temporary file'
+    tempfile:
+      state: file
+      suffix: '.ldif'
+    register: _tempfile
+
+  - name: 'copy initial OLC configuration'
+    template:
+      dest: "{{ _tempfile.path }}"
+      src: 'slapd.ldif.j2'
+      owner: root
+      group: root
+      mode: 0600
+
+  - name: 'set up initial OLC configuration'
+    command: "slapadd -F {{ openldap_server_config_path | quote }} -n 0 -l {{ _tempfile.path | quote }}"
+
+  - name: 'set correct file ownership on {{ openldap_server_config_path }}'
+    file:
+      path: "{{ openldap_server_config_path }}"
+      owner: "{{ openldap_server_user }}"
+      group: "{{ openldap_server_group }}"
+      recurse: true
+
+  - name: 'remove temporary file'
+    file:
+      path: "{{ _tempfile.path }}"
+      state: absent
+
+  when: "not _openldap_slapd_d.stat.exists"
+
+- name: 'make slapd use OLC (Gentoo)'
+  lineinfile:
+    path: '/etc/conf.d/slapd'
+    line: 'OPTS_CONF="-F /etc/${INSTANCE}/slapd.d"'
+    regexp: '(#\s*)?OPTS_CONF=".*"'
+    create: false
+    state: present
+  notify:
+    - 'restart slapd'
+  when: "ansible_facts['os_family'] == 'Gentoo' and ansible_facts['service_mgr'] == 'openrc'"
+
+- name: 'make slapd use OLC (Alpine)'
+  lineinfile:
+    path: '/etc/conf.d/slapd'
+    line: "{{ item.line }}"
+    regexp: "{{ item.regex }}"
+    backrefs: true
+    create: false
+    state: present
+  loop:
+    - line: 'cfgdir="{{ openldap_server_config_path }}"'
+      regex: '(#\s*)?cfgdir=".*"'
+    - line: '#cfgfile=\1'
+      regex: '(?:#\s*)?cfgfile=(.*)'
+  loop_control:
+    label: "{{ item.line }}"
+  notify:
+    - 'restart slapd'
+  when: "ansible_facts['os_family'] == 'Alpine'"
+
+- name: 'disable non-systemd user management (Debian)'
+  lineinfile:
+    path: "{{ openldap_server_service_config_file }}"
+    line: '#\1'
+    regexp: "^({{ item }}=.*)"
+    backrefs: true
+    create: false
+    state: present
+  loop:
+    - 'SLAPD_USER'
+    - 'SLAPD_GROUP'
+  notify:
+    - 'restart slapd'
+  when: "ansible_facts['os_family'] == 'Debian'"
+
+- name: 'make default ldapi:// path usable (Alpine)'
+  file:
+    src: "{{ openldap_server_runtime_path }}"
+    dest: '/var/lib/openldap/run'
+    state: link
+    force: true
+  when: "ansible_facts['os_family'] == 'Alpine'"
+  # because Alpine has a weird compile-time default value for the ldapi:// socket
+
+- name: 'enable LDAPS'
+  lineinfile:
+    path: "{{ openldap_server_service_config_file }}"
+    line: "{{ openldap_server_service_config_line }}"
+    regexp: "{{ openldap_server_service_config_regex }}"
+    backrefs: true
+    state: present
+  notify:
+    - 'openldap_server_reload_service_files'
+    - 'restart slapd'
+  when: "openldap_server_tls_cert is defined"
+
+# If a restart of slapd is pending, do it now.
+- meta: flush_handlers
+
+- name: 'enable and start slapd'
+  service:
+    name: 'slapd'
+    enabled: true
+    state: started
+    masked: "{{ false if ansible_facts['service_mgr'] == 'systemd' else omit }}"
+
+- name: 'determine TLS library'
+  block:
+
+    - name: 'get dynamically linked libraries of slapd'
+      command: "ldd {{ openldap_server_slapd_path | quote }}"
+      changed_when: false
+      register: _ldd_slapd
+
+    - name: 'set library'
+      set_fact:
+        openldap_server_tls_library: "{{ library.name }}"
+      loop:
+        - name: 'openssl'
+          file: 'libssl.so'
+        - name: 'gnutls'
+          file: 'libgnutls.so'
+      loop_control:
+        loop_var: library
+        label: "{{ library.name }}"
+      when: "library.file in _ldd_slapd.stdout"
+
+  when: "openldap_server_tls_library is not defined"
+
+# https://github.com/ansible/ansible/issues/25665
+- name: 'load X.509 certificate and key'
+  command: "ldapmodify -Y EXTERNAL -H ldapi://"
+  args:
+    stdin: |
+      dn: cn=config
+      changetype: modify
+      replace: olcTLSCertificateFile
+      olcTLSCertificateFile: {{ openldap_server_tls_cert }}
+      -
+      replace: olcTLSCertificateKeyFile
+      olcTLSCertificateKeyFile: {{ openldap_server_tls_cert_key }}
+  when: "openldap_server_tls_cert is defined"
+  # ldapmodify gives no indication whether something was changed or not
+
+- name: 'set global configuration options'
+  ldap_attr:
+    dn: "{{ item.dn | default('cn=config') }}"
+    name: "{{ item.key }}"
+    values: "{{ item.value }}"
+    state: exact
+  no_log: "{{ item.no_log | default(false) | bool }}"
+  loop:
+    - dn: 'olcDatabase={0}config,cn=config'
+      key: 'olcRootDN'
+      value: "{{ openldap_server_default_root_dn | default(None) }},cn=config"
+      when: "{{ openldap_server_default_root_dn is defined }}"
+    - dn: 'olcDatabase={0}config,cn=config'
+      key: 'olcRootPW'
+      value: "{CRYPT}{{ openldap_server_default_root_password | default('') | password_hash('sha512', 65535 | random(seed=inventory_hostname) | hash('md5')) }}"
+      no_log: true
+      when: "{{ openldap_server_default_root_password is defined }}"
+    - key: 'olcLogLevel'
+      value: "{{ [openldap_server_loglevel] | flatten | join(' ') }}"
+    - key: 'olcIdleTimeout'
+      value: 30
+    - dn: 'olcDatabase={-1}frontend,cn=config'
+      key: 'olcPasswordHash'
+      value: '{CRYPT}'
+    - key: 'olcPasswordCryptSaltFormat'
+      value: '$6$%.16s'
+    - dn: 'olcDatabase={-1}frontend,cn=config'
+      key: 'olcRequires'
+      value: 'authc'
+    - key: 'olcLocalSSF'
+      value: 128
+    - key: 'olcSecurity'
+      value: 'ssf=128 update_ssf=128 simple_bind=128'
+      when: "{{ openldap_server_tls_cert is defined }}"
+    - key: 'olcTLSProtocolMin'
+      value: "{{ openldap_server_tls13_only | bool | ternary('3.4', '3.3') }}"
+      when: "{{ openldap_server_tls_cert is defined }}"
+    - key: 'olcTLSCipherSuite'
+      value: "{{ openldap_server_ciphers | default(openldap_server_default_ciphers[openldap_server_tls_library]) }}"
+      when: "{{ openldap_server_tls_cert is defined }}"
+    - key: 'olcTLSCACertificateFile'
+      value: "{{ openldap_server_tls_client_ca }}"
+      when: "{{ openldap_server_tls_client_ca is defined }}"
+    - key: 'olcTLSVerifyClient'
+      value: "{{ openldap_server_tls_enforce_client | bool | ternary('demand', 'try') }}"
+      when: "{{ openldap_server_tls_client_ca is defined }}"
+    - key: 'olcSizeLimit'
+      value: "size.soft={{ openldap_server_sizelimit_soft | default(500) }} size.hard={{ openldap_server_sizelimit_hard | default('soft') }} size.unchecked={{ openldap_server_sizelimit_unchecked | default('none') }}"
+    - key: 'olcTimeLimit'
+      value: "time.soft={{ openldap_server_timelimit_soft | default(3600) }} time.hard={{ openldap_server_timelimit_hard | default('soft') }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: "item.when | default(item.value is defined)"
+
+- name: 'load schema definitions'
+  command: "ldapadd -Y EXTERNAL -H ldapi:// -f {{ schema.startswith('/') | ternary(schema, openldap_server_schema_path ~ '/' ~ schema ~ '.ldif') | quote }}"
+  loop: "{{ openldap_server_schemas }}"
+  loop_control:
+    loop_var: schema
+  register: _ldapadd
+  changed_when: "_ldapadd.rc == 0"
+  failed_when: "_ldapadd.rc not in [0, 80]" # Note: if rc == 80, the schema is already loaded. This is not an error.
+
+- name: 'determine builtin modules'
+  command: "{{ openldap_server_slapd_path }} -VVV"
+  register: _slapd_vvv
+  changed_when: false
+  failed_when: '_slapd_vvv.rc != 1'
+
+- name: 'set builtin module list'
+  set_fact:
+    _slapd_included_modules: "{{ ((_slapd_vvv.stderr | regex_search('(?<=Included static overlays:\n)(?s).*(?=Included static backends:)', multiline=true) or '').splitlines() | map('trim') | list) +
+    ((_slapd_vvv.stderr | regex_search('(?<=Included static backends:\n)(?s).*', multiline=true)).splitlines() | map('trim') | map('regex_replace', '^', 'back_') | list) }}"
+
+# https://github.com/ansible/ansible/issues/22287
+- name: 'load modules'
+  ldap_attr:
+    dn: 'cn=module{0},cn=config'
+    name: olcModuleLoad
+    values: "{{ module }}"
+  register: _result
+  failed_when: "_result is failed and \"'Type or value exists'\" not in _result.details | default('')"
+  loop: "{{ openldap_server_modules | difference(_slapd_included_modules) }}"
+  loop_control:
+    loop_var: module
+
+- name: 'determine base distinguished names'
+  set_fact:
+    openldap_server_dit_expanded: "{{ openldap_server_dit_expanded | default([]) + [tree | combine({ 'expanded_dn' : [tree.data.dn] | flatten | mandatory | zip([tree.data.dn] | flatten | map('extract', tree.data.attributes)) | map('join', '=') | join(',') })] }}"
+  loop: "{{ openldap_server_dit }}"
+  loop_control:
+    loop_var: tree
+    label: "{{ [tree.data.dn] | flatten | zip([tree.data.dn] | flatten | map('extract', tree.data.attributes)) | map('join', '=') | join(',') }}"
+
+- include_tasks: ldap_tree.yml
+  loop: "{{ openldap_server_dit_expanded }}"
+  loop_control:
+    loop_var: tree
+    label: "{{ tree.expanded_dn }}"

@@ -1,0 +1,4 @@
+dn: cn=namedObject,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: namedObject
+olcObjectClasses: {0}( 1.3.6.1.4.1.5322.13.1.1 NAME 'namedObject' SUP top STRUCTURAL MAY cn )

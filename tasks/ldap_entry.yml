@@ -1,0 +1,52 @@
+# Adds an entry to the directory using the data in the 'entry' variable.
+# If the entry is of the object class 'sambaDomain', 'sambaSamAccount' or 'sambaGroupMapping' and does not have a full 'sambaSID' attribute, the variable '_samba_sid' is used to create a sambaSID.
+
+- name: 'prepare LDAP entry attributes'
+  set_fact:
+    _entry_attributes: "{{ entry.attributes | default({}) }}"
+
+- block:
+
+  - name: 'determine SambaSID for {{ entry.full_dn }} (sambaDomain)'
+    set_fact:
+      _entry_attributes: "{{ _entry_attributes | combine({'sambaSID': _samba_sid }) }}"
+    when: "'sambadomain' in [entry.objectClass] | flatten | map('lower')"
+
+  - name: 'determine SambaSID for {{ entry.full_dn }} (sambaSamAccount)'
+    set_fact:
+      _entry_attributes: "{{ _entry_attributes | combine({'sambaSID': _samba_sid ~ '-' ~ entry.attributes.sambaSID | default(entry.attributes['uidNumber'] | int * 2 + 1000) }) }}"
+    when: "'sambasamaccount' in [entry.objectClass] | flatten | map('lower') and 'uidNumber' in entry.attributes.keys()"
+
+  - name: 'determine SambaSID for {{ entry.full_dn }} (sambaGroupMapping)'
+    set_fact:
+      _entry_attributes: "{{ _entry_attributes | combine({'sambaSID': _samba_sid ~ '-' ~ entry.attributes.sambaSID | default(entry.attributes['gidNumber'] | int * 2 + 1001) }) }}"
+    when: "'sambagroupmapping' in [entry.objectClass] | flatten | map('lower') and 'gidNumber' in entry.attributes.keys()"
+
+  when: "'sambaSID' not in entry.attributes.keys() or '-' not in entry.attributes.sambaSID"
+
+- name: "add entry {{ entry.full_dn }}"
+  ldap_entry:
+    dn: "{{ entry.full_dn }}"
+    objectClass: "{{ entry.objectClass }}"
+    attributes: "{{ _entry_attributes }}"
+    state: present
+  no_log: "{{ ['olcrootpw', 'userpassword', 'sambalmpassword', 'sambantpassword'] | intersect(_entry_attributes.keys() | map('lower')) | list | count }}"
+
+# FIXME: userPassword attribute handling should not be case-sensitive
+- name: "set attributes on {{ entry.full_dn }}"
+  ldap_attr:
+    dn: "{{ entry.full_dn }}"
+    name: "{{ item.key }}"
+    values: "{{ item.value }}"
+    state: exact
+  loop: "{{ _entry_attributes | dict2items | rejectattr('key', '==', 'userPassword') | list }}"
+  loop_control:
+    label: "{{ item.key }}: {{ item.value }}"
+  no_log: "{{ item.key | lower in ['olcrootpw', 'userpassword', 'sambalmpassword', 'sambantpassword'] }}"
+
+- name: "set userPassword on {{ entry.full_dn }}"
+  ldap_passwd:
+    dn: "{{ entry.full_dn }}"
+    passwd: "{{ _entry_attributes['userPassword'] }}"
+  no_log: true
+  when: "'userPassword' in _entry_attributes"

@@ -1,0 +1,37 @@
+openldap_server_overlay_details:
+  accesslog:
+    objectclass: 'olcAccessLogConfig'
+  auditlog:
+    objectclass: 'olcAuditLogConfig'
+  constraint:
+    objectclass: 'olcConstraintConfig'
+  dds:
+    objectclass: 'olcDDSConfig'
+  dynlist:
+    objectclass: 'olcDynamicList'
+  memberof:
+    objectclass: 'olcMemberOf'
+  pcache:
+    objectclass: 'olcPcacheConfig'
+  ppolicy:
+    schema: 'ppolicy'
+    objectclass: 'olcPPolicyConfig'
+  refint:
+    objectclass: 'olcRefintConfig'
+  retcode:
+    objectclass: 'olcRetcodeConfig'
+  rwm:
+    objectclass: 'olcRwmConfig'
+  smbk5pwd:
+    objectclass: 'olcSmbK5PwdConfig'
+  syncprov:
+    objectclass: 'olcSyncProvConfig'
+  translucent:
+    objectclass: 'olcTranslucentConfig'
+  unique:
+    objectclass: 'olcUniqueConfig'
+  valsort:
+    objectclass: 'olcValSortConfig'
+openldap_server_default_ciphers:
+  openssl: 'AESGCM:CHACHA20:!aNULL:!RSA:!PSK'
+  gnutls: 'NORMAL:-MAC-ALL:+AEAD:-RSA:%SERVER_PRECEDENCE'

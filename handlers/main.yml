@@ -1,0 +1,12 @@
+---
+- name: 'reload service files'
+  systemd:
+    daemon_reload: true
+  listen: openldap_server_reload_service_files
+  when: "ansible_facts['service_mgr'] == 'systemd'"
+
+- name: 'restart slapd'
+  service:
+    name: 'slapd'
+    state: 'restarted'
+    masked: "{{ false if ansible_facts['service_mgr'] == 'systemd' else omit }}"
