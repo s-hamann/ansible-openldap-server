@@ -1,14 +1,5 @@
-openldap_server_pkgs:
-  - 'openldap'
-  - 'python-ldap'
-openldap_server_user: 'ldap'
-openldap_server_group: 'ldap'
 openldap_server_slapd_path: "/usr/lib{{ (ansible_facts['userspace_bits'] == '64') | ternary('64', '') }}/openldap/slapd"
-openldap_server_config_path: '/etc/openldap/slapd.d'
-openldap_server_schema_path:  '/etc/openldap/schema'
 openldap_server_module_path: "/usr/lib{{ (ansible_facts['userspace_bits'] == '64') | ternary('64', '') }}/openldap/openldap"
-openldap_server_runtime_path: '/run/openldap'
-openldap_server_db_path: '/var/lib/openldap-data'
 openldap_server_service_config_file: "{{ (ansible_facts['service_mgr'] == 'openrc') | ternary('/etc/conf.d/slapd', '/etc/systemd/system/slapd.service.d/00gentoo.conf') }}"
 openldap_server_service_config_regex: "{{ (ansible_facts['service_mgr'] == 'openrc') | ternary('^(OPTS=.* -h .).*(ldapi://.*)', '^(Environment=.SLAPD_URLS=).*(ldapi://.*)') }}"
 openldap_server_service_config_line: '\1ldap:/// ldaps:/// \2'
