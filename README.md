@@ -13,6 +13,10 @@ This roles does not handle deploying certificates.
 If the target system runs Alpine Linux, Ansible must be configured to use Python 3 on the target system.
 This is due to Alpine no longer packaging python-ldap for Python 2.
 
+When this role sets passwords for entries with the object class `sambaSamAccount` but no `sambaNTPassword` attribute and `openldap_server_sync_samba` is `false`, the `sambaNTPassword` attribute is automatically set to match the newly set password.
+This requires passlib to be available on the controller.
+If passlib is not installed, the respective tasks will fail, but not cause the role to fail.
+
 Role Variables
 --------------
 

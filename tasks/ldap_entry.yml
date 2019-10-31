@@ -24,6 +24,16 @@
 
   when: "'sambaSID' not in entry.attributes.keys() or '-' not in entry.attributes.sambaSID"
 
+- name: "set sambaNTPassword for {{ entry.full_dn }}"
+  set_fact:
+    _entry_attributes: "{{ _entry_attributes | combine({'sambaNTPassword': _entry_attributes['userPassword'] | password_hash('nthash')}) }}"
+  ignore_errors: true # requires passlib on the controller
+  no_log: true
+  when: "'sambasamaccount' in [entry.objectClass] | flatten | map('lower') and
+         'sambantpassword' not in _entry_attributes.keys() | map('lower') and
+         'userPassword' in _entry_attributes.keys() and
+         not openldap_server_sync_samba"
+
 - name: "add entry {{ entry.full_dn }}"
   ldap_entry:
     dn: "{{ entry.full_dn }}"
