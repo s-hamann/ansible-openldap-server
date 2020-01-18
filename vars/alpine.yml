@@ -70,6 +70,7 @@ openldap_server_pkgs_extra:
     - 'openldap-overlay-unique'
   valsort:
     - 'openldap-overlay-valsort'
+openldap_server_db_path: '/var/lib/openldap/openldap-data'
 openldap_server_service_config_file: '/etc/conf.d/slapd'
 openldap_server_service_config_regex: '^(?:#\s*)?(command_args=".*-h '').*ldapi://.*(''")'
 openldap_server_service_config_line: '\1ldap:/// ldaps:/// ldapi:///\2'
