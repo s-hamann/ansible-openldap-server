@@ -2,6 +2,7 @@ openldap_server_pkgs:
   - 'openldap'
   - 'openldap-clients'
   - 'py3-pyldap'
+  - 'openldap-openrc'
 openldap_server_pkgs_extra:
   back_bdb:
     - 'openldap-back-bdb'
