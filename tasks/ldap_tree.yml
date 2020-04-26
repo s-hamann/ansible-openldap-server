@@ -7,7 +7,7 @@
 
 - name: 'determine root password'
   set_fact:
-    _olcRootPW: "{{ tree.root_password | default(openldap_server_default_root_password) | password_hash('sha512', 65535 | random(seed=inventory_hostname~tree.expanded_dn) | hash('md5')) }}"
+    _olcRootPW: "{{ tree.root_password | default(openldap_server_default_root_password) | password_hash('sha512', (65535 | random(seed=inventory_hostname~tree.expanded_dn) | hash('md5'))[:16]) }}"
   no_log: true
   when: "tree.root_dn | default(openldap_server_default_root_dn) is defined and tree.root_password | default(openldap_server_default_root_password) is defined"
 
