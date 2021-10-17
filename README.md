@@ -116,6 +116,10 @@ Role Variables
   This allows granting access to additional resources, such as the private key file.
   All groups need to exist on the target system; this role does not create them.
   Empty by default.
+* `openldap_server_inaccessible_paths`  
+  If the target system uses systemd, this option takes a list of paths, that should not be accessible at all for OpenLDAP.
+  Regardless of this option, home directories are made inaccessible and the rest of the file system is mostly read-only.
+  Optional.
 * `openldap_server_dit`  
   A list of per-DIT configuration setting dictionaries.
   The following keys are valid:

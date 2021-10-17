@@ -11,6 +11,7 @@ openldap_server_loglevel:
 openldap_server_tls_enforce_client: true
 openldap_server_tls13_only: false
 openldap_server_extra_groups: []
+openldap_server_inaccessible_paths: []
 openldap_server_overlay_defaults:
   constraint:
     olcConstraintAttribute:
