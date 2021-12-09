@@ -20,11 +20,8 @@
   when: '_enable_overlay is changed'
 
 - name: "configure overlay {{ overlay }}"
-  ldap_attr:
+  ldap_attrs:
     dn: "olcOverlay={{ _active_overlays | map('regex_search', '\\{[0-9]+\\}' ~ overlay | regex_escape) | select('string') | first }},{{ _tree_config_dn }}"
-    name: "{{ item.key }}"
-    values: "{{ item.value }}"
+    attributes:
+      "{{ openldap_server_overlay_defaults[overlay | lower] | default({}) | combine(openldap_server_overlay_config[overlay | lower] | default({})) }}"
     state: exact
-  loop: "{{ openldap_server_overlay_defaults[overlay | lower] | default({}) | combine(openldap_server_overlay_config[overlay | lower] | default({})) | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}: {{ item.value }}"

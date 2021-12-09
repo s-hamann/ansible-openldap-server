@@ -44,15 +44,11 @@
 
 # FIXME: userPassword attribute handling should not be case-sensitive
 - name: "set attributes on {{ entry.full_dn }}"
-  ldap_attr:
+  ldap_attrs:
     dn: "{{ entry.full_dn }}"
-    name: "{{ item.key }}"
-    values: "{{ item.value }}"
+    attributes: "{{ _entry_attributes | dict2items | rejectattr('key', '==', 'userPassword') | list | items2dict }}"
     state: exact
-  loop: "{{ _entry_attributes | dict2items | rejectattr('key', '==', 'userPassword') | list }}"
-  loop_control:
-    label: "{{ item.key }}: {{ item.value }}"
-  no_log: "{{ item.key | lower in ['olcrootpw', 'userpassword', 'sambalmpassword', 'sambantpassword'] }}"
+  no_log: "{{ _entry_attributes.keys() | map('lower') | intersect(['olcrootpw', 'userpassword', 'sambalmpassword', 'sambantpassword']) | count > 0 }}"
 
 - name: "set userPassword on {{ entry.full_dn }}"
   ldap_passwd:

@@ -42,13 +42,9 @@
   set_fact:
     _indexed_dn: "{{ (_ldapsearch_indexed_dn.stdout | trim)[4:] }}"
 
-- name: 'set database-specific configuration options'
-  ldap_attr:
-    dn: "{{ _indexed_dn }}"
-    name: "{{ item.key }}"
-    values: "{{ item.value | default(None) }}"
-    state: exact
-  no_log: "{{ item.no_log | default(false) | bool }}"
+- name: 'prepare database-specific configuration options'
+  set_fact:
+    _indxed_dn_attributes: "{{ _indxed_dn_attributes | default({}) | combine({ item.key : item.value }) }}"
   loop:
     - key: 'olcRootDN'
       value: "{{ _olcRootDN }}"
@@ -63,13 +59,21 @@
       when: "{{ tree.db_checkpoint_bytes is defined or tree.db_checkpoint_time is defined }}"
   loop_control:
     label: "{{ item.key }}"
+  no_log: "{{ item.no_log | default(false) | bool }}"
   when: "item.when | default(item.value)"
 
-- name: 'set indices'
-  ldap_attr:
+- name: 'set database-specific configuration options'
+  ldap_attrs:
     dn: "{{ _indexed_dn }}"
-    name: 'olcDbIndex'
-    values: "{{ index.key }} {{ [index.value] | flatten | join(',') }}"
+    attributes: "{{ _indxed_dn_attributes }}"
+    state: exact
+  no_log: "{{ _olcRootPW is defined }}"
+
+- name: 'set indices'
+  ldap_attrs:
+    dn: "{{ _indexed_dn }}"
+    attributes:
+      olcDbIndex: "{{ index.key }} {{ [index.value] | flatten | join(',') }}"
     state: present
   loop: "{{ tree.indices | default({}) | dict2items }}"
   loop_control:
@@ -81,10 +85,10 @@
     tree_acls: "{{ openldap_server_default_acls + tree.acls | default([]) }}"
 
 - name: 'set ACLs'
-  ldap_attr:
+  ldap_attrs:
     dn: "{{ _indexed_dn }}"
-    name: 'olcAccess'
-    values: "{{ range(tree_acls | length) | map('regex_replace', '([0-9]+)', '{\\1}') | zip(tree_acls) | map('join', '') | list }}"
+    attributes:
+      olcAccess: "{{ range(tree_acls | length) | map('regex_replace', '([0-9]+)', '{\\1}') | zip(tree_acls) | map('join', '') | list }}"
     state: exact
 
 - name: 'prepare ppolicy configuration'

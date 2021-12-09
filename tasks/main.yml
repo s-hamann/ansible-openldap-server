@@ -323,74 +323,63 @@
 
   when: "openldap_server_tls_library is not defined"
 
-# https://github.com/ansible/ansible/issues/25665
-- name: 'load X.509 certificate and key'
-  command: "ldapmodify -Y EXTERNAL -H ldapi://"
-  args:
-    stdin: |
-      dn: cn=config
-      changetype: modify
-      replace: olcTLSCertificateFile
-      olcTLSCertificateFile: {{ openldap_server_tls_cert }}
-      -
-      replace: olcTLSCertificateKeyFile
-      olcTLSCertificateKeyFile: {{ openldap_server_tls_cert_key }}
+- name: 'set up TLS'
+  ldap_attrs:
+    dn: 'cn=config'
+    attributes:
+      olcTLSCertificateFile: "{{ openldap_server_tls_cert }}"
+      olcTLSCertificateKeyFile: "{{ openldap_server_tls_cert_key }}"
+      olcLocalSSF: 128
+      olcSecurity: 'ssf=128 update_ssf=128 simple_bind=128'
+      olcTLSProtocolMin: "{{ openldap_server_tls13_only | bool | ternary('3.4', '3.3') }}"
+      olcTLSCipherSuite: "{{ openldap_server_ciphers | default(openldap_server_default_ciphers[openldap_server_tls_library]) }}"
+    state: exact
   when: "openldap_server_tls_cert is defined"
-  # ldapmodify gives no indication whether something was changed or not
+
+- name: 'set up TLS client authentication'
+  ldap_attrs:
+    dn: 'cn=config'
+    attributes:
+      olcTLSCACertificateFile: "{{ openldap_server_tls_client_ca }}"
+      olcTLSVerifyClient: "{{ openldap_server_tls_enforce_client | bool | ternary('demand', 'try') }}"
+    state: exact
+  when: "openldap_server_tls_client_ca is defined"
+
+- name: 'set global root DN'
+  ldap_attrs:
+    dn: 'olcDatabase={0}config,cn=config'
+    attributes:
+      olcRootDN: "{{ openldap_server_default_root_dn | default(None) }},cn=config"
+    state: exact
+  when: "openldap_server_default_root_dn is defined"
+
+- name: 'set global root DN password'
+  ldap_attrs:
+    dn: 'olcDatabase={0}config,cn=config'
+    attributes:
+      olcRootPW: "{CRYPT}{{ openldap_server_default_root_password | default('') | password_hash('sha512', (65535 | random(seed=inventory_hostname) | hash('md5'))[:16]) }}"
+    state: exact
+  no_log: true
+  when: "openldap_server_default_root_password is defined"
+
+- name: 'set frontend security settings'
+  ldap_attrs:
+    dn: 'olcDatabase={-1}frontend,cn=config'
+    attributes:
+      olcRequires: 'authc'
+      olcPasswordHash: '{CRYPT}'
+    state: exact
 
 - name: 'set global configuration options'
-  ldap_attr:
-    dn: "{{ item.dn | default('cn=config') }}"
-    name: "{{ item.key }}"
-    values: "{{ item.value }}"
+  ldap_attrs:
+    dn: 'cn=config'
+    attributes:
+      olcLogLevel: "{{ [openldap_server_loglevel] | flatten | join(' ') }}"
+      olcIdleTimeout: 30
+      olcPasswordCryptSaltFormat: '$6$%.16s'
+      olcSizeLimit: "size.soft={{ openldap_server_sizelimit_soft | default(500) }} size.hard={{ openldap_server_sizelimit_hard | default('soft') }} size.unchecked={{ openldap_server_sizelimit_unchecked | default('none') }}"
+      olcTimeLimit: "time.soft={{ openldap_server_timelimit_soft | default(3600) }} time.hard={{ openldap_server_timelimit_hard | default('soft') }}"
     state: exact
-  no_log: "{{ item.no_log | default(false) | bool }}"
-  loop:
-    - dn: 'olcDatabase={0}config,cn=config'
-      key: 'olcRootDN'
-      value: "{{ openldap_server_default_root_dn | default(None) }},cn=config"
-      when: "{{ openldap_server_default_root_dn is defined }}"
-    - dn: 'olcDatabase={0}config,cn=config'
-      key: 'olcRootPW'
-      value: "{CRYPT}{{ openldap_server_default_root_password | default('') | password_hash('sha512', (65535 | random(seed=inventory_hostname) | hash('md5'))[:16]) }}"
-      no_log: true
-      when: "{{ openldap_server_default_root_password is defined }}"
-    - key: 'olcLogLevel'
-      value: "{{ [openldap_server_loglevel] | flatten | join(' ') }}"
-    - key: 'olcIdleTimeout'
-      value: 30
-    - dn: 'olcDatabase={-1}frontend,cn=config'
-      key: 'olcPasswordHash'
-      value: '{CRYPT}'
-    - key: 'olcPasswordCryptSaltFormat'
-      value: '$6$%.16s'
-    - dn: 'olcDatabase={-1}frontend,cn=config'
-      key: 'olcRequires'
-      value: 'authc'
-    - key: 'olcLocalSSF'
-      value: 128
-    - key: 'olcSecurity'
-      value: 'ssf=128 update_ssf=128 simple_bind=128'
-      when: "{{ openldap_server_tls_cert is defined }}"
-    - key: 'olcTLSProtocolMin'
-      value: "{{ openldap_server_tls13_only | bool | ternary('3.4', '3.3') }}"
-      when: "{{ openldap_server_tls_cert is defined }}"
-    - key: 'olcTLSCipherSuite'
-      value: "{{ openldap_server_ciphers | default(openldap_server_default_ciphers[openldap_server_tls_library]) }}"
-      when: "{{ openldap_server_tls_cert is defined }}"
-    - key: 'olcTLSCACertificateFile'
-      value: "{{ openldap_server_tls_client_ca }}"
-      when: "{{ openldap_server_tls_client_ca is defined }}"
-    - key: 'olcTLSVerifyClient'
-      value: "{{ openldap_server_tls_enforce_client | bool | ternary('demand', 'try') }}"
-      when: "{{ openldap_server_tls_client_ca is defined }}"
-    - key: 'olcSizeLimit'
-      value: "size.soft={{ openldap_server_sizelimit_soft | default(500) }} size.hard={{ openldap_server_sizelimit_hard | default('soft') }} size.unchecked={{ openldap_server_sizelimit_unchecked | default('none') }}"
-    - key: 'olcTimeLimit'
-      value: "time.soft={{ openldap_server_timelimit_soft | default(3600) }} time.hard={{ openldap_server_timelimit_hard | default('soft') }}"
-  loop_control:
-    label: "{{ item.key }}"
-  when: "item.when | default(item.value is defined)"
 
 - name: 'load schema definitions'
   command: "ldapadd -Y EXTERNAL -H ldapi:// -f {{ schema.startswith('/') | ternary(schema, openldap_server_schema_path ~ '/' ~ schema ~ '.ldif') | quote }}"
@@ -414,10 +403,10 @@
 
 # https://github.com/ansible/ansible/issues/22287
 - name: 'load modules'
-  ldap_attr:
+  ldap_attrs:
     dn: 'cn=module{0},cn=config'
-    name: olcModuleLoad
-    values: "{{ module }}"
+    attributes:
+      olcModuleLoad: "{{ module }}"
   register: _result
   failed_when: "_result is failed and \"'Type or value exists'\" not in _result.details | default('')"
   loop: "{{ openldap_server_modules | difference(_slapd_included_modules) }}"
