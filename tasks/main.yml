@@ -34,7 +34,6 @@
 - name: 'prepare module and overlay requirements'
   set_fact:
     openldap_server_pkgs: "{{ openldap_server_pkgs | union(openldap_server_modules | select('in', openldap_server_pkgs_extra | default({})) | map('extract', openldap_server_pkgs_extra | default({})) | flatten) }}"
-    openldap_server_schemas: "{{ openldap_server_schemas | union(openldap_server_overlays | select('in', openldap_server_overlay_details) | map('extract', openldap_server_overlay_details) | map(attribute='schema') | select('defined') | list | flatten) }}"
 
 - name: 'determine default ACLs'
   set_fact:

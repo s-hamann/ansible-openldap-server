@@ -27,7 +27,7 @@ Role Variables
   Only used on Gentoo.
 * `openldap_server_overlays`  
   A list of overlays to activate.
-  Note: Schemas and modules required by these overlays are loaded automatically and need not be configured in the respective configuration options.
+  Note: Modules required by these overlays are loaded automatically and need not be configured in `openldap_server_modules`.
 * `openldap_server_schemas`  
   A list of schemas to load.
   Entries can either be names (e.g. `core`) or paths to remote files in LDIF format (e.g. `/etc/openldap/schema/core.ldif`).

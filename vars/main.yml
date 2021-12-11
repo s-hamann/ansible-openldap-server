@@ -14,7 +14,6 @@ openldap_server_overlay_details:
   pcache:
     objectclass: 'olcPcacheConfig'
   ppolicy:
-    schema: 'ppolicy'
     objectclass: 'olcPPolicyConfig'
   refint:
     objectclass: 'olcRefintConfig'
