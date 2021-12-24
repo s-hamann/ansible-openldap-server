@@ -122,3 +122,4 @@
   loop: "{{ tree.data | ldap_tree2list }}"
   loop_control:
     loop_var: entry
+    label: "{{ entry['full_dn'] }}"
