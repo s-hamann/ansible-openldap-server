@@ -46,9 +46,17 @@
 - name: "set attributes on {{ entry.full_dn }}"
   ldap_attrs:
     dn: "{{ entry.full_dn }}"
-    attributes: "{{ _entry_attributes | dict2items | rejectattr('key', '==', 'userPassword') | list | items2dict }}"
+    attributes: "{{ _entry_attributes | dict2items | rejectattr('key', 'in', ['member', 'userPassword']) | list | items2dict }}"
     state: exact
   no_log: "{{ _entry_attributes.keys() | map('lower') | intersect(['olcrootpw', 'userpassword', 'sambalmpassword', 'sambantpassword']) | count > 0 }}"
+
+- name: "set group members for {{ entry.full_dn }}"
+  ldap_attrs:
+    dn: "{{ entry.full_dn }}"
+    attributes:
+      member: "{{ _entry_attributes['member'] }}"
+    state: present
+  when: "'member' in _entry_attributes.keys()"
 
 - name: "set userPassword on {{ entry.full_dn }}"
   ldap_passwd:
