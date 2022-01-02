@@ -4,6 +4,8 @@ openldap_server_pkgs:
   - 'py3-pyldap'
   - 'openldap-openrc'
 openldap_server_pkgs_extra:
+  back_asyncmeta:
+    - 'openldap-back-asyncmeta'
   back_bdb:
     - 'openldap-back-bdb'
   back_dnssrv:
@@ -16,16 +18,12 @@ openldap_server_pkgs_extra:
     - 'openldap-back-mdb'
   back_meta:
     - 'openldap-back-meta'
-  back_monitor:
-    - 'openldap-back-monitor'
   back_null:
     - 'openldap-back-null'
   back_passwd:
     - 'openldap-back-passwd'
   back_relay:
     - 'openldap-back-relay'
-  back_shell:
-    - 'openldap-back-shell'
   back_sock:
     - 'openldap-back-sock'
   back_sql:
@@ -34,6 +32,8 @@ openldap_server_pkgs_extra:
     - 'openldap-overlay-accesslog'
   auditlog:
     - 'openldap-overlay-auditlog'
+  autoca:
+    - 'openldap-overlay-autoca'
   collect:
     - 'openldap-overlay-collect'
   constraint:
@@ -46,14 +46,32 @@ openldap_server_pkgs_extra:
     - 'openldap-overlay-dyngroup'
   dynlist:
     - 'openldap-overlay-dynlist'
+  homedir:
+    - 'openldap-overlay-homedir'
+  lastbind:
+    - 'openldap-overlay-lastbind'
+  lloadd:
+    - 'openldap-back-lload'
   memberof:
     - 'openldap-overlay-memberof'
+  mqtt:
+    - 'openldap-overlay-mqtt'
+  otp:
+    - 'openldap-overlay-otp'
   pcache:
     - 'openldap-overlay-proxycache'
   ppolicy:
     - 'openldap-overlay-ppolicy'
+  argon2:
+    - 'openldap-passwd-argon2'
+  pw-pbkdf2:
+    - 'openldap-passwd-pbkdf2'
+  pw-sha2:
+    - 'openldap-passwd-sha2'
   refint:
     - 'openldap-overlay-refint'
+  remoteauth:
+    - 'openldap-overlay-remoteauth'
   retcode:
     - 'openldap-overlay-retcode'
   rwm:
