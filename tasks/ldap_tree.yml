@@ -36,6 +36,7 @@
 - name: "get indexed database DN of tree {{ tree.expanded_dn }}"
   command: "ldapsearch -Y EXTERNAL -H ldapi:// -LLL -b 'cn=config' -s one 'olcSuffix={{ tree.expanded_dn }}' dn"
   changed_when: false
+  check_mode: false
   register: _ldapsearch_indexed_dn
 
 - name: "extract indexed database DN of tree {{ tree.expanded_dn }}"

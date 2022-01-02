@@ -305,6 +305,7 @@
     - name: 'get dynamically linked libraries of slapd'
       command: "ldd {{ openldap_server_slapd_path | quote }}"
       changed_when: false
+      check_mode: false
       register: _ldd_slapd
 
     - name: 'set library'
@@ -393,6 +394,7 @@
   command: "{{ openldap_server_slapd_path }} -VVV"
   register: _slapd_vvv
   changed_when: false
+  check_mode: false
   failed_when: '_slapd_vvv.rc > 1'
 
 - name: 'set builtin module list'

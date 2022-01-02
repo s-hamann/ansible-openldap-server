@@ -6,6 +6,7 @@
 - name: "get active overlays"
   command: "ldapsearch -Y EXTERNAL -H ldapi:// -LLL -b {{ _tree_config_dn | quote }} -s one 'objectClass=olcOverlayConfig' olcOverlay"
   changed_when: false
+  check_mode: false
   register: _ldapsearch_active_overlays
 
 - name: 'extract active overlays'
