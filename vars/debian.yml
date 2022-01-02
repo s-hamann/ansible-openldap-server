@@ -3,6 +3,14 @@ openldap_server_pkgs:
   - 'ldap-utils'
   - "{{ (ansible_facts['python']['version']['major'] == 2) | ternary('python-ldap', 'python3-ldap') }}"
 openldap_server_pkgs_extra:
+  pw-apr1:
+    - 'slapd-contrib'
+  pw-argon2:
+    - 'slapd-contrib'
+  pw-netscape:
+    - 'slapd-contrib'
+  pw-pbkdf2:
+    - 'slapd-contrib'
   smbk5pwd:
     - 'slapd-contrib'
 openldap_server_user: 'openldap'
