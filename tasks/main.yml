@@ -393,7 +393,7 @@
   command: "{{ openldap_server_slapd_path }} -VVV"
   register: _slapd_vvv
   changed_when: false
-  failed_when: '_slapd_vvv.rc != 1'
+  failed_when: '_slapd_vvv.rc > 1'
 
 - name: 'set builtin module list'
   set_fact:
