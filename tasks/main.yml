@@ -82,6 +82,12 @@
             - kerberos
             - smbkrb5passwd
           when: "{{ openldap_server_sync_kerberos | bool }}"
+        - use:
+            - ssl
+            - pbkdf2
+          when: "{{ 'pw-pbkdf2' in openldap_server_modules }}"
+        - use: sha2
+          when: "{{ 'pw-sha2' in openldap_server_modules }}"
       when: "item.when"
 
     - name: 'set USE flags for net-nds/openldap'
