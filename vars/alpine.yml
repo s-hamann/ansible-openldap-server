@@ -88,6 +88,24 @@ openldap_server_pkgs_extra:
     - 'openldap-overlay-unique'
   valsort:
     - 'openldap-overlay-valsort'
+openldap_server_pw_hash_module:
+  ARGON2: argon2
+  PBKDF2-SHA1: pw-pbkdf2
+  PBKDF2-SHA256: pw-pbkdf2
+  PBKDF2-SHA512: pw-pbkdf2
+  PBKDF2: pw-pbkdf2
+  SHA256: pw-sha2
+  SHA384: pw-sha2
+  SHA512: pw-sha2
+  SSHA256: pw-sha2
+  SSHA384: pw-sha2
+  SSHA512: pw-sha2
+  TOTP1: pw-totp
+  TOTP1ANDPW: pw-totp
+  TOTP256: pw-totp
+  TOTP256ANDPW: pw-totp
+  TOTP512: pw-totp
+  TOTP512ANDPW: pw-totp
 openldap_server_db_path: '/var/lib/openldap/openldap-data'
 openldap_server_service_config_file: '/etc/conf.d/slapd'
 openldap_server_service_config_regex: '^(?:#\s*)?(command_args=".*-h '').*ldapi://.*(''")'

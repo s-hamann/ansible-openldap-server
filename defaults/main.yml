@@ -8,6 +8,7 @@ openldap_server_sync_kerberos: false
 openldap_server_skip_default_acls: false
 openldap_server_loglevel:
   - 'stats'
+openldap_server_pw_hash: ARGON2
 openldap_server_tls_enforce_client: true
 openldap_server_tls13_only: false
 openldap_server_extra_groups: []

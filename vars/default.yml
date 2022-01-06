@@ -1,6 +1,30 @@
 openldap_server_pkgs:
   - 'openldap'
   - 'python-ldap'
+openldap_server_pw_hash_module:
+  ARGON2: argon2
+  APR1: pw-apr1
+  BSDMD5: pw-apr1
+  KERBEROS: pw-kerberos
+  NS-MTA-MD5: pw-netscape
+  PBKDF2-SHA1: pw-pbkdf2
+  PBKDF2-SHA256: pw-pbkdf2
+  PBKDF2-SHA512: pw-pbkdf2
+  PBKDF2: pw-pbkdf2
+  RADIUS: pw-radius
+  SHA256: pw-sha2
+  SHA384: pw-sha2
+  SHA512: pw-sha2
+  SSHA256: pw-sha2
+  SSHA384: pw-sha2
+  SSHA512: pw-sha2
+  TOTP1: pw-totp
+  TOTP1ANDPW: pw-totp
+  TOTP256: pw-totp
+  TOTP256ANDPW: pw-totp
+  TOTP512: pw-totp
+  TOTP512ANDPW: pw-totp
+  K5KEY: smbk5pwd
 openldap_server_user: 'ldap'
 openldap_server_group: 'ldap'
 openldap_server_slapd_path: '/usr/sbin/slapd'

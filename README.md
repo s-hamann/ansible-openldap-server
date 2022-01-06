@@ -38,7 +38,7 @@ Role Variables
 * `openldap_server_modules`  
   A list of modules to load.
   Entries are file names and can be absolute or relative to the module directory.
-  Note: Overlay modules and backend modules for the databases in use are automatically added to this list.
+  Note: Overlay modules, password hash modules and backend modules for the databases in use are automatically added to this list.
 * `openldap_server_sync_samba`  
   Keep `userPassword` in sync with the fields required by Samba.
   This uses the `smbk5pwd` overlay, which is automatically activated.
@@ -89,6 +89,11 @@ Role Variables
 * `openldap_server_timelimit_hard`  
   The global hard time limit on queries (in seconds).
   Default is the same value as the soft limit.
+* `openldap_server_pw_hash`  
+  The password hashing algorithm OpenLDAP will use for user passwords.
+  When set to `CRYPT`, SHA512-Crypt is used.
+  This setting does not affect the password hash for root DN, which always uses SHA512-Crypt.
+  Defaults to `ARGON2`.
 * `openldap_server_tls_cert`  
   Path to a PEM-encoded X.509 certificate for slapd to use.
   The file needs to exist and be readable by the OpenLDAP user.

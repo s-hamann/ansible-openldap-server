@@ -27,9 +27,14 @@
     openldap_server_schemas: "{{ openldap_server_schemas | union(['krb5-kdc']) }}"
   when: "openldap_server_sync_kerberos | bool"
 
+- name: 'prepare TOTP requirements'
+  set_fact:
+    openldap_server_overlays: "{{ openldap_server_overlays | union(['totp']) }}"
+  when: "openldap_server_pw_hash.startswith('TOTP')"
+
 - name: 'prepare modules list'
   set_fact:
-    openldap_server_modules: "{{ openldap_server_modules | union(openldap_server_overlays) | union(openldap_server_dit | map(attribute='database') | map('default', 'mdb') | map('regex_replace', '^', 'back_') | list) }}"
+    openldap_server_modules: "{{ openldap_server_modules | union(openldap_server_overlays) | union(openldap_server_dit | map(attribute='database') | map('default', 'mdb') | map('regex_replace', '^', 'back_') | list) | union([openldap_server_pw_hash_module[openldap_server_pw_hash]| default([])] | flatten) }}"
 
 - name: 'prepare module and overlay requirements'
   set_fact:
@@ -368,14 +373,6 @@
   no_log: true
   when: "openldap_server_default_root_password is defined"
 
-- name: 'set frontend security settings'
-  ldap_attrs:
-    dn: 'olcDatabase={-1}frontend,cn=config'
-    attributes:
-      olcRequires: 'authc'
-      olcPasswordHash: '{CRYPT}'
-    state: exact
-
 - name: 'set global configuration options'
   ldap_attrs:
     dn: 'cn=config'
@@ -419,6 +416,14 @@
   loop: "{{ openldap_server_modules | difference(_slapd_included_modules) }}"
   loop_control:
     loop_var: module
+
+- name: 'set frontend security settings'
+  ldap_attrs:
+    dn: 'olcDatabase={-1}frontend,cn=config'
+    attributes:
+      olcRequires: 'authc'
+      olcPasswordHash: "{{ '{' ~ openldap_server_pw_hash ~ '}' }}"
+    state: exact
 
 - name: 'determine base distinguished names'
   set_fact:
