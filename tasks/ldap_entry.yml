@@ -64,3 +64,10 @@
     passwd: "{{ _entry_attributes['userPassword'] }}"
   no_log: true
   when: "'userPassword' in _entry_attributes"
+
+- name: "remove password reset flag from {{ entry.full_dn }}"
+  ldap_attrs:
+    dn: "{{ entry.full_dn }}"
+    attributes:
+      pwdReset: 'FALSE'
+  when: "'userPassword' in _entry_attributes and 'ppolicy' in openldap_server_overlays"
