@@ -6,12 +6,8 @@ openldap_server_pkgs:
 openldap_server_pkgs_extra:
   back_asyncmeta:
     - 'openldap-back-asyncmeta'
-  back_bdb:
-    - 'openldap-back-bdb'
   back_dnssrv:
     - 'openldap-back-dnssrv'
-  back_hdb:
-    - 'openldap-back-hdb'
   back_ldap:
     - 'openldap-back-ldap'
   back_mdb:
