@@ -70,4 +70,5 @@
     dn: "{{ entry.full_dn }}"
     attributes:
       pwdReset: 'FALSE'
+      sambaPwdLastSet: "{{ ('sambasamaccount' in [entry.objectClass] | flatten | map('lower')) | ternary('1', omit) }}"
   when: "'userPassword' in _entry_attributes and 'ppolicy' in openldap_server_overlays"
