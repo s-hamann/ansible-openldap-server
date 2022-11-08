@@ -2,8 +2,10 @@
 dn: cn=config
 objectClass: olcGlobal
 cn: config
+{% if alpine_facts['os_family'] != 'Alpine' %}
 olcArgsFile: {{ openldap_server_runtime_path }}/slapd.args
 olcPidFile: {{ openldap_server_runtime_path }}/slapd.pid
+{% endif %}
 
 dn: cn=schema,cn=config
 objectClass: olcSchemaConfig
