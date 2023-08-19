@@ -402,8 +402,8 @@
 
 - name: 'set builtin module list'
   set_fact:
-    _slapd_included_modules: "{{ ((_slapd_vvv.stderr | regex_search('(?<=Included static overlays:\n)(?s).*(?=Included static backends:)', multiline=true) or '').splitlines() | map('trim') | list) +
-    ((_slapd_vvv.stderr | regex_search('(?<=Included static backends:\n)(?s).*', multiline=true)).splitlines() | map('trim') | map('regex_replace', '^', 'back_') | list) }}"
+    _slapd_included_modules: "{{ ((_slapd_vvv.stderr | regex_search('(?s)(?<=Included static overlays:\n).*(?=Included static backends:)', multiline=true) or '').splitlines() | map('trim') | list) +
+    ((_slapd_vvv.stderr | regex_search('(?s)(?<=Included static backends:\n).*', multiline=true)).splitlines() | map('trim') | map('regex_replace', '^', 'back_') | list) }}"
 
 # https://github.com/ansible/ansible/issues/22287
 - name: 'load modules'
