@@ -255,7 +255,7 @@
     state: present
   loop:
     - line: 'cfgdir="{{ openldap_server_config_path }}"'
-      regex: '(#\s*)?cfgdir=".*"'
+      regex: '(#\s*)?cfgdir=.*'
     - line: '#cfgfile=\1'
       regex: '(?:#\s*)?cfgfile=(.*)'
   loop_control:

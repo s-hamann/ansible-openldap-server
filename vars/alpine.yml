@@ -1,3 +1,4 @@
+---
 openldap_server_pkgs:
   - 'openldap'
   - 'openldap-clients'
@@ -104,5 +105,5 @@ openldap_server_pw_hash_module:
   TOTP512ANDPW: pw-totp
 openldap_server_db_path: '/var/lib/openldap/openldap-data'
 openldap_server_service_config_file: '/etc/conf.d/slapd'
-openldap_server_service_config_regex: '^(?:#\s*)?(command_args=".*-h '').*ldapi://.*(''")'
-openldap_server_service_config_line: '\1ldap:/// ldaps:/// ldapi:///\2'
+openldap_server_service_config_regex: '^(?:#\s*)?listen_uris="?(.*)"?'
+openldap_server_service_config_line: 'listen_uris="ldap:/// ldaps:/// ldapi:///"'
